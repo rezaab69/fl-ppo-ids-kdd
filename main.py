@@ -15,14 +15,17 @@ import glob
 # *********************************************** #
 # *********************************************** #
 # initialize poisoned clients
-poisoned_clients_data = [1,2]
+poisoned_clients_data = []
 poisoned_clients_model = []
 poisoned_clients_byzantine = []
 # initialize Aggregation algorithm
 # fed_avg geometric median multi_krum bulyan coordinate_median adaptive_trimmed_mean best client
 Aggregation_algorithm = "geometric median"
 # True or False
-weighted_with_history = True
+weighted_with_history = False
+# initialize zero attack
+zero_attack = True
+attack_type = "ipsweep"
 # *********************************************** #
 # *********************************************** #
 
@@ -78,6 +81,17 @@ le2 = LabelEncoder()
 features = data.drop(columns=['attack'])
 labels = le2.fit_transform(attack_n)
 
+# Save original attack labels for evaluation
+original_attack_labels = data['attack'].copy()
+
+# If zero_attack is True, remove/mask 'attack' info from data before training
+if zero_attack:
+    features = data.drop(columns=['attack'])
+else:
+    features = data.drop(columns=['attack'])  # Default behavior (could be extended)
+
+labels = le2.fit_transform(attack_n)
+
 scaler = StandardScaler()
 features = scaler.fit_transform(features)
 
@@ -87,7 +101,8 @@ X_train = torch.tensor(X_train_np, dtype=torch.float32)
 y_train = torch.tensor(y_train_np, dtype=torch.long)
 X_test = torch.tensor(X_test_np, dtype=torch.float32)
 y_test = torch.tensor(y_test_np, dtype=torch.long)
-
+# For evaluation with attack_type data
+original_attack_labels_train, original_attack_labels_test = train_test_split(original_attack_labels, test_size=0.2, random_state=42)
 
 class ActorCritic(nn.Module):
     def __init__(self, input_dim, hidden_dim, num_actions):
@@ -533,6 +548,21 @@ for round in range(1, federated_rounds + 1):
     # Store global accuracy
     round_record['global_accuracy'] = global_accuracy
     accuracy_records.append(round_record)
+
+    # After model training, evaluate with attack_type data if zero_attack is True
+    if zero_attack:
+        # Use the trained model to predict on X_test
+        global_model.eval()
+        with torch.no_grad():
+            outputs = global_model(X_test)
+            if isinstance(outputs, tuple):
+                outputs = outputs[0]
+            _, predicted = torch.max(outputs, 1)
+        # Calculate accuracy with original attack labels
+        attack_label_encoder = LabelEncoder()
+        true_attack_labels = attack_label_encoder.fit_transform(original_attack_labels_test)
+        accuracy = (predicted.numpy() == true_attack_labels).mean()
+        print(f"Model accuracy with attack_type data: {accuracy:.4f}")
 
 # Find existing model_accuracies files
 # existing_files = glob.glob('model_accuracies_*.csv')
