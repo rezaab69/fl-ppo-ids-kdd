@@ -22,7 +22,7 @@ poisoned_clients_byzantine = []
 # fed_avg geometric median multi_krum bulyan coordinate_median adaptive_trimmed_mean best client
 Aggregation_algorithm = "geometric median"
 # True or False
-weighted_with_history = False
+weighted_with_history = True
 # initialize zero attack
 zero_attack = True
 attack_type = "ipsweep"
