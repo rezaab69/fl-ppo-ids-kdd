@@ -33,7 +33,7 @@ pip install torch numpy pandas scikit-learn
 ### 3. Project Structure
 ```
 fl-ppo-ids-kdd/
-├── PPO-FL-POS-GM-KDD.py       # Python script version
+├── main.py       # Python script version
 └── KDDTrain+.txt              # Dataset file
 ```
 
