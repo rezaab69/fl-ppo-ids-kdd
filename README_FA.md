@@ -18,7 +18,7 @@ python -m venv venv
 
 # فعال‌سازی محیط مجازی
 # در ویندوز:
-.env\Scriptsctivate
+.\venv\Scripts\activate
 # در Unix یا MacOS:
 source venv/bin/activate
 ```
