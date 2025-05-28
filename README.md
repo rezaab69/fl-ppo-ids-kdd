@@ -62,7 +62,7 @@ fl-ppo-ids-kdd/
 
 #### Option 1: Python Script
 ```bash
-python PPO-FL-POS-GM-KDD.py
+python main.py
 ```
 
 ### 6. Expected Output
