@@ -27,7 +27,11 @@ source venv/bin/activate
 Run the following command to install all necessary dependencies:
 
 ```bash
+# On Windows or MacOS:
 pip install torch numpy pandas scikit-learn
+# On Unix:
+pip install numpy pandas scikit-learn
+pip3 install torch --index-url https://download.pytorch.org/whl/cpu
 ```
 
 ### 3. Project Structure
@@ -57,6 +61,17 @@ fl-ppo-ids-kdd/
 - `poisoned_clients_model`: List of clients with poisoned models
 - `poisoned_clients_byzantine`: List of byzantine clients
 - `weighted_with_history`: Whether to use historical accuracy for weighting (default: True)
+
+
+#### Attack Configuration
+
+##### Zero Attack Mode
+- `zero_attack`: Boolean flag to enable/disable zero-attack mode
+  - `True`: Attack type information is removed during training
+  - `False`: Attack type information is available during training
+
+##### Attack Type
+- `attack_type`: Specifies which attack type to focus on (e.g., "neptune", "ipsweep", "back")
 
 ### 5. Running the Code
 
