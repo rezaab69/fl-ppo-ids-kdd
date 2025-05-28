@@ -70,7 +70,7 @@ poisoned_clients_byzantine = []
 
 # Aggregation settings
 Aggregation_algorithm = "geometric median"
-weighted_with_history = False
+weighted_with_history = True
 
 # Attack configuration
 zero_attack = True
