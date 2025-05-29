@@ -73,6 +73,9 @@ fl-ppo-ids-kdd/
 ##### Attack Type
 - `attack_type`: Specifies which attack type to focus on (e.g., "neptune", "ipsweep", "back")
 
+##### Attack Data Ratio
+- `attack_data_ratio`: Ratio of attack data used for training the model and data used for testing(e.g., 0.5 for 50%)
+
 ### 5. Running the Code
 
 #### Option 1: Python Script
