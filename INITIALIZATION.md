@@ -53,6 +53,11 @@ zero_attack = True
 attack_type = "neptune"  # Focus on neptune attack type
 ```
 
+### Zero-Day Attack Settings
+- `attack_data_ratio`: Ratio of attack data to use for training (default: `0.1`)
+  - The remaining `1 - attack_data_ratio` will be used for evaluation
+
+
 ## Best Practices
 
 1. **Security vs. Performance**: More robust aggregation methods (like Bulyan) are more secure but may reduce model performance.
