@@ -15,7 +15,7 @@ import glob
 # *********************************************** #
 # *********************************************** #
 # initialize poisoned clients
-poisoned_clients_data = []
+poisoned_clients_data = [1,2]
 poisoned_clients_model = []
 poisoned_clients_byzantine = []
 # initialize Aggregation algorithm
@@ -23,9 +23,10 @@ poisoned_clients_byzantine = []
 Aggregation_algorithm = "geometric median"
 # True or False
 weighted_with_history = True
-# initialize zero attack
-zero_attack = True
+zero_attack = True  # Set to True to enable attack data removal and splitting
 attack_type = "ipsweep"
+# Variable ratio for splitting removed_attack_data
+attack_data_ratio = 0.1  # Set this as needed (e.g., 0.5 for 50%)
 # *********************************************** #
 # *********************************************** #
 
@@ -66,6 +67,35 @@ columns = (['duration', 'protocol_type', 'service', 'flag', 'src_bytes',
 
 data.columns = columns
 
+if zero_attack:
+    # Separate the specified attack type
+    removed_attack_data = data[data['attack'] == attack_type].copy()
+    data = data[data['attack'] != attack_type].copy()
+
+    # Shuffle removed_attack_data for randomness
+    removed_attack_data = removed_attack_data.sample(frac=1, random_state=42).reset_index(drop=True)
+
+    # Split removed_attack_data into two parts
+    split_idx = int(len(removed_attack_data) * attack_data_ratio)
+    removed_attack_data_to_merge = removed_attack_data.iloc[:split_idx].copy()
+    removed_attack_data_eval = removed_attack_data.iloc[split_idx:].copy()
+
+    # Merge one part back with data
+    data = pd.concat([data, removed_attack_data_to_merge], ignore_index=True)
+
+    # Prepare attack_n for removed_attack_data_eval
+    attack_n_removed = []
+    for i in removed_attack_data_eval.attack:
+        if i == 'normal':
+            attack_n_removed.append("normal")
+        else:
+            attack_n_removed.append("attack")
+else:
+    # If zero_attack is False, set empty DataFrames for removed attack data
+    removed_attack_data_eval = pd.DataFrame()
+    attack_n_removed = []
+
+# Prepare attack_n for main data (this runs in both cases)
 attack_n = []
 for i in data.attack:
     if i == 'normal':
@@ -73,36 +103,41 @@ for i in data.attack:
     else:
         attack_n.append("attack")
 
+# Prepare attack_n for removed_attack_data_eval
+attack_n_removed = []
+for i in removed_attack_data_eval.attack:
+    if i == 'normal':
+        attack_n_removed.append("normal")
+    else:
+        attack_n_removed.append("attack")
+
+# Label encoding and scaling for removed_attack_data_eval
+le1_removed = LabelEncoder()
+for x in ['protocol_type', 'service', 'flag']:
+    removed_attack_data_eval[x] = le1_removed.fit_transform(removed_attack_data_eval[x])
+le2_removed = LabelEncoder()
+features_removed = removed_attack_data_eval.drop(columns=['attack'])
+labels_removed = le2_removed.fit_transform(attack_n_removed)
+scaler_removed = StandardScaler()
+features_removed = scaler_removed.fit_transform(features_removed)
+X_removed = torch.tensor(features_removed, dtype=torch.float32)
+y_removed = torch.tensor(labels_removed, dtype=torch.long)
+
+# Label encoding and scaling for merged data
 le1 = LabelEncoder()
 for x in ['protocol_type', 'service', 'flag']:
     data[x] = le1.fit_transform(data[x])
-
 le2 = LabelEncoder()
 features = data.drop(columns=['attack'])
 labels = le2.fit_transform(attack_n)
-
-# Save original attack labels for evaluation
-original_attack_labels = data['attack'].copy()
-
-# If zero_attack is True, remove/mask 'attack' info from data before training
-if zero_attack:
-    features = data.drop(columns=['attack'])
-else:
-    features = data.drop(columns=['attack'])  # Default behavior (could be extended)
-
-labels = le2.fit_transform(attack_n)
-
 scaler = StandardScaler()
 features = scaler.fit_transform(features)
-
 X_train_np, X_test_np, y_train_np, y_test_np = train_test_split(features, labels, test_size=0.2, random_state=42)
-
 X_train = torch.tensor(X_train_np, dtype=torch.float32)
 y_train = torch.tensor(y_train_np, dtype=torch.long)
 X_test = torch.tensor(X_test_np, dtype=torch.float32)
 y_test = torch.tensor(y_test_np, dtype=torch.long)
-# For evaluation with attack_type data
-original_attack_labels_train, original_attack_labels_test = train_test_split(original_attack_labels, test_size=0.2, random_state=42)
+
 
 class ActorCritic(nn.Module):
     def __init__(self, input_dim, hidden_dim, num_actions):
@@ -549,31 +584,27 @@ for round in range(1, federated_rounds + 1):
     round_record['global_accuracy'] = global_accuracy
     accuracy_records.append(round_record)
 
-    # After model training, evaluate with attack_type data if zero_attack is True
-    if zero_attack:
-        # Use the trained model to predict on X_test
-        global_model.eval()
-        with torch.no_grad():
-            outputs = global_model(X_test)
-            if isinstance(outputs, tuple):
-                outputs = outputs[0]
-            _, predicted = torch.max(outputs, 1)
-        # Calculate accuracy with original attack labels
-        attack_label_encoder = LabelEncoder()
-        true_attack_labels = attack_label_encoder.fit_transform(original_attack_labels_test)
-        accuracy = (predicted.numpy() == true_attack_labels).mean()
-        print(f"Model accuracy with attack_type data: {accuracy:.4f}")
+    # Evaluate and print accuracy on removed attack data
+    if zero_attack and 'X_removed' in globals() and 'y_removed' in globals():
+        def evaluate_removed_attack_data(model, X_removed, y_removed, device):
+            model.eval()
+            with torch.no_grad():
+                probs, _ = model(X_removed.to(device))
+                _, predicted = torch.max(probs, 1)
+                correct = (predicted == y_removed.to(device)).sum().item()
+                accuracy = correct / y_removed.size(0)
+            return accuracy
 
-# Find existing model_accuracies files
-# existing_files = glob.glob('model_accuracies_*.csv')
-# Extract numbers from filenames
-# file_numbers = [int(f.replace('model_accuracies_', '').replace('.csv', ''))
-#                 for f in existing_files if
-#                 f.startswith('model_accuracies_') and f.replace('model_accuracies_', '').replace('.csv', '').isdigit()]
-# Determine the next file number
-# next_number = max(file_numbers + [0]) + 1 if file_numbers else 1
-# Save to new file
-# output_file = f'model_accuracies_{next_number}.csv'
-# accuracy_df = pd.DataFrame(accuracy_records)
-# accuracy_df.to_csv(output_file, index=False)
-# print(f"Accuracy results saved to '{output_file}'")
+
+        # After global model update, evaluate on removed attack data
+        removed_data_accuracy = evaluate_removed_attack_data(global_model, X_removed, y_removed, device)
+        print(f"Accuracy on removed attack data (attack_type='{attack_type}'): {removed_data_accuracy:.4f}")
+        round_record['removed_attack_accuracy'] = removed_data_accuracy
+
+        accuracy_records.append(round_record)
+    else:
+        global_accuracy = []
+
+    # Store global accuracy
+    round_record['global_accuracy'] = global_accuracy
+    accuracy_records.append(round_record)
