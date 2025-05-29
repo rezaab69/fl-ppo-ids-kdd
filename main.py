@@ -15,7 +15,7 @@ import glob
 # *********************************************** #
 # *********************************************** #
 # initialize poisoned clients
-poisoned_clients_data = [1,2]
+poisoned_clients_data = []
 poisoned_clients_model = []
 poisoned_clients_byzantine = []
 # initialize Aggregation algorithm
@@ -23,10 +23,10 @@ poisoned_clients_byzantine = []
 Aggregation_algorithm = "geometric median"
 # True or False
 weighted_with_history = True
-zero_attack = True  # Set to True to enable attack data removal and splitting
+zero_attack = False  # Set to True to enable attack data removal and splitting
 attack_type = "ipsweep"
 # Variable ratio for splitting removed_attack_data
-attack_data_ratio = 0.1  # Set this as needed (e.g., 0.5 for 50%)
+attack_data_ratio = 0.9  # Set this as needed (e.g., 0.5 for 50%)
 # *********************************************** #
 # *********************************************** #
 
@@ -105,23 +105,29 @@ for i in data.attack:
 
 # Prepare attack_n for removed_attack_data_eval
 attack_n_removed = []
-for i in removed_attack_data_eval.attack:
-    if i == 'normal':
-        attack_n_removed.append("normal")
-    else:
-        attack_n_removed.append("attack")
+if not removed_attack_data_eval.empty:  # Only process if DataFrame is not empty
+    for i in removed_attack_data_eval.attack:
+        if i == 'normal':
+            attack_n_removed.append("normal")
+        else:
+            attack_n_removed.append("attack")
 
 # Label encoding and scaling for removed_attack_data_eval
-le1_removed = LabelEncoder()
-for x in ['protocol_type', 'service', 'flag']:
-    removed_attack_data_eval[x] = le1_removed.fit_transform(removed_attack_data_eval[x])
-le2_removed = LabelEncoder()
-features_removed = removed_attack_data_eval.drop(columns=['attack'])
-labels_removed = le2_removed.fit_transform(attack_n_removed)
-scaler_removed = StandardScaler()
-features_removed = scaler_removed.fit_transform(features_removed)
-X_removed = torch.tensor(features_removed, dtype=torch.float32)
-y_removed = torch.tensor(labels_removed, dtype=torch.long)
+if zero_attack:  # Only process if zero_attack is True
+    le1_removed = LabelEncoder()
+    for x in ['protocol_type', 'service', 'flag']:
+        removed_attack_data_eval[x] = le1_removed.fit_transform(removed_attack_data_eval[x])
+    le2_removed = LabelEncoder()
+    features_removed = removed_attack_data_eval.drop(columns=['attack'])
+    labels_removed = le2_removed.fit_transform(attack_n_removed)
+    scaler_removed = StandardScaler()
+    features_removed = scaler_removed.fit_transform(features_removed)
+    X_removed = torch.tensor(features_removed, dtype=torch.float32)
+    y_removed = torch.tensor(labels_removed, dtype=torch.long)
+else:
+    # Create empty tensors when zero_attack is False
+    X_removed = torch.tensor([], dtype=torch.float32)
+    y_removed = torch.tensor([], dtype=torch.long)
 
 # Label encoding and scaling for merged data
 le1 = LabelEncoder()
